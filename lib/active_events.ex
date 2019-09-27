@@ -23,11 +23,11 @@ defmodule ActiveEx.Events do
     ## Callbacks
 
     @impl true
-    def init(_stack) do
+    def init(stack) do
       # IO.puts("fs subscribe elixir")
-      {:ok, pid} = :fs.start_link(:active_ex)
+      {:ok, _pid} = :fs.start_link(:active_ex)
       :fs.subscribe(:active_ex)
-      {:ok, pid}
+      {:ok, stack}
     end
 
     @impl true
@@ -48,23 +48,25 @@ defmodule ActiveEx.Events do
     end
 
     @impl true
-    def handle_info({_Pid, {:fs, :file_event}, {path, _flags}}, state) do
-      reload(path)
+    def handle_info({_Pid, {:fs, :file_event}, {path, flags}}, state) do
+      reload(path, flags)
+
 
       {:noreply, state}
     end
 
-    def handle_info(event, state) do
+    def handle_info(_event, state) do
       # IO.inspect(event, label: "active unknown info")
 
       {:noreply, state}
     end
 
-    def terminate(reason, state) do
-      {reason, state}
-    end
+    # @impl true
+    # def terminate(reason, state) do
+    #   {reason, state}
+    # end
 
-    def reload(path) do
+    def reload(path, flags) do
       dirs = Path.split(path)
       except = [".elixir_ls", "build", "_build", "ebin", "test", ".git"]
       is_filtered = Enum.any?(except, fn p ->
@@ -77,8 +79,14 @@ defmodule ActiveEx.Events do
         false -> case Path.extname(path) do
                   ".erl" -> #IO.inspect(path, label: "active erlang")
                             m = get_module_name(dirs)
+                            case m do
+                              [] -> IO.puts("Couldn't find deps-app name for the erlang path = #{path}")
+                              _ -> :os.cmd(String.to_charlist("mix deps.compile #{m}"))
+                                   IEx.Helpers.l(m)
+                            end
                             IO.puts("Recompiling erlang module #{m}")
-                            IEx.Helpers.r(m)
+                            # IO.inspect(flags, label: "path flags")
+
                    ".ex" -> #IO.inspect(path, label: "active elixir")
 
                             IO.puts("Recompiling elixir module (active receive: #{path})")
@@ -113,7 +121,12 @@ defmodule ActiveEx.Events do
                                               _ -> acc
                                             end
                                           end)
-      String.to_atom(name)
+
+      case is_boolean(name) do
+        true -> []
+        false -> String.to_atom(name)
+      end
+
 
     end
   end

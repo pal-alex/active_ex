@@ -1,17 +1,4 @@
 defmodule ActiveEx.Supervisor do
-  @moduledoc """
-  Documentation for ActiveEx.
-  """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> ActiveEx.hello()
-      :world
-
-  """
   use Supervisor
 
   def start(_,_) do
