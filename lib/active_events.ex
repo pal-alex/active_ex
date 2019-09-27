@@ -24,7 +24,7 @@ defmodule ActiveEx.Events do
 
     @impl true
     def init(_stack) do
-      IO.puts("fs subscribe elixir")
+      # IO.puts("fs subscribe elixir")
       {:ok, pid} = :fs.start_link(:active_ex)
       :fs.subscribe(:active_ex)
       {:ok, pid}
@@ -55,9 +55,13 @@ defmodule ActiveEx.Events do
     end
 
     def handle_info(event, state) do
-      IO.inspect(event, label: "active unknown info")
+      # IO.inspect(event, label: "active unknown info")
 
       {:noreply, state}
+    end
+
+    def terminate(reason, state) do
+      {reason, state}
     end
 
     def reload(path) do
@@ -76,9 +80,14 @@ defmodule ActiveEx.Events do
                             IO.puts("Recompiling erlang module #{m}")
                             IEx.Helpers.r(m)
                    ".ex" -> #IO.inspect(path, label: "active elixir")
-                            m = get_module_name(dirs)
-                            IO.puts("Recompiling all elixir modules (active get: #{path})")
-                            IEx.Helpers.recompile(force: true)
+
+                            IO.puts("Recompiling elixir module (active receive: #{path})")
+                            case IEx.Helpers.c(to_string(path), :in_memory) do
+                              [] -> :ignore
+                              [mod|_] -> IEx.Helpers.r(mod)
+                            end
+                            # IEx.Helpers.recompile(force: true)
+
                             # IEx.Helpers.r(m)
                   ".exs" -> IO.inspect(path, label: "active elixir script")
                   ".hrl" -> IO.inspect(path, label: "active records")
@@ -89,6 +98,11 @@ defmodule ActiveEx.Events do
       end
 
     end
+
+    def test() do
+      IO.puts("test 4!")
+    end
+
     def get_module_name(dirs) do
       name = Enum.reduce(dirs, false, fn x, acc -> case acc do
                                               true -> x
