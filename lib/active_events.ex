@@ -50,8 +50,6 @@ defmodule ActiveEx.Events do
     @impl true
     def handle_info({_Pid, {:fs, :file_event}, {path, flags}}, state) do
       reload(path, flags)
-
-
       {:noreply, state}
     end
 
@@ -81,18 +79,31 @@ defmodule ActiveEx.Events do
                             m = get_module_name(dirs)
                             case m do
                               [] -> IO.puts("Couldn't find deps-app name for the erlang path = #{path}")
-                              _ -> :os.cmd(String.to_charlist("mix deps.compile #{m}"))
-                                   IEx.Helpers.l(m)
+                              _ -> try do
+                                      result = :os.cmd(String.to_charlist("mix deps.compile #{m}"))
+                                      case result do
+                                        [] -> IEx.Helpers.l(m)
+                                              IO.puts("Recompiling erlang module #{m}")
+                                        _ -> IO.inspect(result, label: "Recompiling error")
+                                      end
+
+                                   rescue
+                                      _ -> inspect(__STACKTRACE__)
+                                   end
                             end
-                            IO.puts("Recompiling erlang module #{m}")
+
                             # IO.inspect(flags, label: "path flags")
 
                    ".ex" -> #IO.inspect(path, label: "active elixir")
 
                             IO.puts("Recompiling elixir module (active receive: #{path})")
-                            case IEx.Helpers.c(to_string(path), :in_memory) do
-                              [] -> :ignore
-                              [mod|_] -> IEx.Helpers.r(mod)
+                            try do
+                                case IEx.Helpers.c(to_string(path), :in_memory) do
+                                  [] -> :ignore
+                                  [mod|_] -> IEx.Helpers.r(mod)
+                                end
+                            rescue
+                                _ -> inspect(__STACKTRACE__)
                             end
                             # IEx.Helpers.recompile(force: true)
 

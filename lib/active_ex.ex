@@ -1,6 +1,7 @@
-defmodule ActiveEx.Supervisor do
+defmodule ActiveEx do
   use Supervisor
 
+  def start(), do: start([],[])
   def start(_,_) do
     Supervisor.start_link(__MODULE__, [], name: __MODULE__)
   end
