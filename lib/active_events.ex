@@ -39,6 +39,7 @@ defmodule ActiveEx.Events do
     @impl true
     def handle_cast(event, state) do
       inspect(event, label: "active cast event:")
+      # spawn (fn -> ActiveEx.start self, {} end)
       {:noreply, state}
     end
 
@@ -75,22 +76,28 @@ defmodule ActiveEx.Events do
         true -> #IO.inspect(path, label: "active filtered")
                 :skip
         false -> case Path.extname(path) do
-                  ".erl" -> #IO.inspect(path, label: "active erlang")
-                            m = get_module_name(dirs)
-                            case m do
-                              [] -> IO.puts("Couldn't find deps-app name for the erlang path = #{path}")
-                              _ -> try do
-                                      result = :os.cmd(String.to_charlist("mix deps.compile #{m}"))
-                                      case result do
-                                        [] -> IEx.Helpers.l(m)
-                                              IO.puts("Recompiling erlang module #{m}")
-                                        _ -> IO.inspect(result, label: "Recompiling error")
-                                      end
+                  Erl when Erl == ".erl" or Erl == ".hrl" -> IO.inspect(path, label: "active erlang")
+                                          m = get_module_name(dirs)
+                                          case m do
+                                            [] -> # IO.puts("Couldn't find deps-app name for the erlang path = #{path}")
+                                                  # m = Path.basename(path, ".erl")
+                                                  # Iex.Helpers.c(path, :in_memory)
+                                                  case IEx.Helpers.c(to_string(path), :in_memory) do
+                                                    [] -> :ignore
+                                                    [mod|_] -> IEx.Helpers.l(mod)
+                                                  end
+                                            _ -> try do
+                                                    result = :os.cmd(String.to_charlist("mix deps.compile #{m}"))
+                                                    IEx.Helpers.l(m)
+                                                    case result do
+                                                      [] -> IO.puts("Recompiled erlang module #{m}")
+                                                      _ -> IO.inspect(result, label: "Recompiling error/warnings")
+                                                    end
 
-                                   rescue
-                                      _ -> inspect(__STACKTRACE__)
-                                   end
-                            end
+                                                rescue
+                                                    _ -> inspect(__STACKTRACE__)
+                                                end
+                                          end
 
                             # IO.inspect(flags, label: "path flags")
 
