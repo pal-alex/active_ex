@@ -58,7 +58,13 @@ defmodule ActiveEx.Events do
       messages = :erlang.iolist_to_binary(:lists.reverse(acc))
       IO.puts(messages)
       mod = Keyword.fetch!(state, :mod)
-      IEx.Helpers.l(mod)
+      # TODO: нужно l все erl файлы проекта
+      files = Path.wildcard(File.cwd!()<>"/deps/#{mod}/src/*.erl")
+      Enum.each(files, fn f ->
+                          mod0 = String.to_atom(Path.basename(f, ".erl"))
+                          IEx.Helpers.l(mod0)
+                       end)
+
       stateAfter = []
       {:noreply, stateAfter}
     end
@@ -83,7 +89,7 @@ defmodule ActiveEx.Events do
       mod = Keyword.fetch!(state, :mod)
       case mod do
         [] -> :skip
-        _ -> run(String.to_charlist("mix deps.compile #{mod}"))
+        _ -> run(String.to_charlist("mix deps.compile #{mod} --force"))
       end
 
       {:noreply, state}
