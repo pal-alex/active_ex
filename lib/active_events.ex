@@ -5,11 +5,7 @@ defmodule ActiveEx.Events do
 
   @doc """
   Subcribe on :fs events.
-
-  ## Examples
-
-      iex> ActiveEx.hello()
-      :world
+  ReCompiling all *.ex and *.erl files
 
   """
 
@@ -24,7 +20,8 @@ defmodule ActiveEx.Events do
 
     @impl true
     def init(stack) do
-      # IO.puts("fs subscribe elixir")
+      Process.flag(:trap_exit, true)
+      IO.puts("fs subscribe active_ex")
       {:ok, _pid} = :fs.start_link(:active_ex)
       :fs.subscribe(:active_ex)
       {:ok, stack}
@@ -32,97 +29,147 @@ defmodule ActiveEx.Events do
 
     @impl true
     def handle_call(event, _from, state) do
-      inspect(event, label: "active call event:")
+      inspect(event, label: "active_ex: call event:")
       {:reply, :ok, state}
     end
 
+
     @impl true
     def handle_cast(event, state) do
-      inspect(event, label: "active cast event:")
+      inspect(event, label: "active_ex: cast event:")
       # spawn (fn -> ActiveEx.start self, {} end)
       {:noreply, state}
     end
 
     def handle_request(event, state) do
-      inspect(event, label: "active request event:")
+      inspect(event, label: "active_ex: request event:")
       {:noreply, state}
     end
 
     @impl true
     def handle_info({_Pid, {:fs, :file_event}, {path, flags}}, state) do
-      reload(path, flags)
+      # IO.inspect(state, label: "state before file_event #{path}")
+      stateAfter = reload(path, flags, state)
+      {:noreply, stateAfter}
+    end
+
+    def handle_info({_port, {:exit_status, _status}}, state) do
+      acc = Keyword.get(state, :acc, [])
+      messages = :erlang.iolist_to_binary(:lists.reverse(acc))
+      IO.puts(messages)
+      mod = Keyword.fetch!(state, :mod)
+      IEx.Helpers.l(mod)
+      stateAfter = []
+      {:noreply, stateAfter}
+    end
+
+    def handle_info({_port, {:data, {type, line}}}, state) when type == :eol or type == :noeol do
+        # IO.inspect(state, label: "state before line")
+        acc = Keyword.get(state, :acc, [])
+        stateAfter = Keyword.put(state, :acc, [line|acc])
+        {:noreply, stateAfter}
+    end
+
+    def handle_info({_port, {:data, data}}, state) do
+      # IO.inspect(state, label: "state before :data")
+      acc = Keyword.get(state, :acc, [])
+      stateAfter = Keyword.put(state, :acc, [data|acc])
+      {:noreply, stateAfter}
+    end
+    def handle_info({_port, :eof}, state), do: {:noreply, state}
+
+    def handle_info(:run, state) do
+      # IO.inspect(state, label: "state before run")
+      mod = Keyword.fetch!(state, :mod)
+      case mod do
+        [] -> :skip
+        _ -> run(String.to_charlist("mix deps.compile #{mod}"))
+      end
+
       {:noreply, state}
     end
 
-    def handle_info(_event, state) do
-      # IO.inspect(event, label: "active unknown info")
-
+    def handle_info(event, state) do
+      IO.inspect(event, label: "active_ex: unknown info")
       {:noreply, state}
     end
 
-    # @impl true
-    # def terminate(reason, state) do
-    #   {reason, state}
-    # end
 
-    def reload(path, flags) do
+    @impl true
+    def terminate(reason, state) do
+      IO.inspect(reason, label: "active_ex: terminating")
+      {reason, state}
+    end
+
+    def reload(path, _flags, state) do
       dirs = Path.split(path)
       except = [".elixir_ls", "build", "_build", "ebin", "test", ".git"]
       is_filtered = Enum.any?(except, fn p ->
                                           Enum.member?(dirs, p)
                                        end)
 
-      case is_filtered do
-        true -> #IO.inspect(path, label: "active filtered")
-                :skip
-        false -> case Path.extname(path) do
-                  Erl when Erl == ".erl" or Erl == ".hrl" -> IO.inspect(path, label: "active erlang")
-                                          m = get_module_name(dirs)
-                                          case m do
-                                            [] -> # IO.puts("Couldn't find deps-app name for the erlang path = #{path}")
-                                                  # m = Path.basename(path, ".erl")
-                                                  # Iex.Helpers.c(path, :in_memory)
-                                                  case IEx.Helpers.c(to_string(path), :in_memory) do
-                                                    [] -> :ignore
-                                                    [mod|_] -> IEx.Helpers.l(mod)
-                                                  end
-                                            _ -> try do
-                                                    result = :os.cmd(String.to_charlist("mix deps.compile #{m}"))
-                                                    IEx.Helpers.l(m)
-                                                    case result do
-                                                      [] -> IO.puts("Recompiled erlang module #{m}")
-                                                      _ -> IO.inspect(result, label: "Recompiling error/warnings")
-                                                    end
+      stateAfter = case is_filtered do
+                      true -> #IO.inspect(path, label: "active filtered")
+                              state
+                      false -> path_before = Keyword.get(state, :path, [])
+                              ext = Path.extname(path)
+                              stateAfter1 = case {path, ext} do
+                                              {^path_before, _} -> state
+                                              {_, ext} when ext == ".erl" or ext == ".hrl" ->
+                                                            state0 = Keyword.put(state, :path, path)
+                                                            mod = get_module_name(dirs)
 
-                                                rescue
-                                                    _ -> inspect(__STACKTRACE__)
-                                                end
+                                                            stateAfter0 = case mod do
+                                                                              [] -> IO.puts("active_ex: Recompiling erlang modules (received: #{path})")
+                                                                                    try do
+                                                                                        compile_load(path, false)
+                                                                                    rescue
+                                                                                        _ -> inspect(__STACKTRACE__)
+                                                                                    end
+                                                                                    state0
+                                                                              _ -> IO.puts("active_ex: Recompiling deps/#{mod} erlang project (received: #{path})")
+                                                                                    state1 = Keyword.put(state0, :mod, mod)
+                                                                                    try do
+                                                                                      handle_info(:run, state1)
+                                                                                    rescue
+                                                                                      _ -> inspect(__STACKTRACE__)
+                                                                                    end
+                                                                                    state1
+                                                                            end
+                                                            stateAfter0
+                                                            # IO.inspect(flags, label: "path flags")
+
+                                              {_, ".ex"} -> state0 = Keyword.put(state, :path, path)
+                                                            IO.puts("active_ex: Recompiling elixir module (received: #{path})")
+                                                            try do
+                                                                compile_load(path, true)
+                                                            rescue
+                                                                _ -> inspect(__STACKTRACE__)
+                                                            end
+                                                            []
+
+                                              {_, ".exs"} -> IO.inspect(path, label: "active_ex: Changed elixir script (do nothing)")
+                                                            state
+                                              {_, _} -> state
+                                                      #IO.inspect(path, label: "active_ex trash files")
                                           end
+                                # IO.inspect(stateAfter1, label: "(RELOAD) stateAfter1")
+                                stateAfter1
 
-                            # IO.inspect(flags, label: "path flags")
+            end
+      stateAfter
+    end
 
-                   ".ex" -> #IO.inspect(path, label: "active elixir")
-
-                            IO.puts("Recompiling elixir module (active receive: #{path})")
-                            try do
-                                case IEx.Helpers.c(to_string(path), :in_memory) do
-                                  [] -> :ignore
-                                  [mod|_] -> IEx.Helpers.r(mod)
-                                end
-                            rescue
-                                _ -> inspect(__STACKTRACE__)
-                            end
-                            # IEx.Helpers.recompile(force: true)
-
-                            # IEx.Helpers.r(m)
-                  ".exs" -> IO.inspect(path, label: "active elixir script")
-                  ".hrl" -> IO.inspect(path, label: "active records")
-                       _ -> :skip
-                            #IO.inspect(path, label: "active trash files")
-                end
-
+    def compile_load(path, recompile) do
+      case IEx.Helpers.c(to_string(path), :in_memory) do
+        [] -> IO.puts("active_ex: Couldn't compile #{path}")
+              :ignore
+        modules -> Enum.each(modules, fn(mod) -> case recompile do
+                                                    true -> IEx.Helpers.r(mod)
+                                                    false -> IEx.Helpers.l(mod)
+                                                 end
+                                      end)
       end
-
     end
 
     def test() do
@@ -144,7 +191,40 @@ defmodule ActiveEx.Events do
         true -> []
         false -> String.to_atom(name)
       end
-
-
     end
+
+
+    # sh functions
+    def reduce({_, chunk}, acc), do: [chunk|acc]
+    def reduce([], acc), do: acc
+    def reduce(data, acc), do: [data|acc]
+
+    def run(args) do
+      _port = :erlang.open_port({:spawn_executable, :os.find_executable('sh')},
+                        [:stream, :in, :out, :eof, :use_stdio, :stderr_to_stdout, :binary, :exit_status,
+                          {:args, ["-c", args]}, {:cd, :erlang.element(2, :file.get_cwd())}, {:env, []}])
+
+      # {:done, _status, info} = sh(port)
+      # info
+    end
+
+    def sh(port), do: sh(port, &__MODULE__.reduce/2, [])
+    def sh(port, fun, acc) do
+          receive do
+            # {_Pid, {:fs, :file_event}, {^path, _}} -> sh(port, fun, fun.([], acc))
+            {_Pid, {:fs, :file_event}, _} = data -> handle_info(data, [])
+                                            sh(port, fun, fun.([], acc))
+            # {^port, :eof} -> sh(port, fun, fun.([], acc))
+            {^port, {:exit_status, status}} -> {:done, status, :erlang.iolist_to_binary(:lists.reverse(acc))}
+
+              {^port, {:data, {:eol, line}}} -> sh(port, fun, fun.({:eol, line}, acc))
+            {^port, {:data, {:noeol, line}}} -> sh(port, fun, fun.({:noeol, line}, acc))
+                      {^port, {:data, data}} -> sh(port, fun, fun.(data, acc))
+                       data -> #IO.inspect(data, label: "sh loop ignore data")
+                              handle_info(data, [])
+                              sh(port, fun, fun.([], acc)) #{:exit, data, :erlang.iolist_to_binary(:lists.reverse(acc))}
+
+          end
+    end
+
   end
