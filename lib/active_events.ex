@@ -59,7 +59,7 @@ defmodule ActiveEx.Events do
       IO.puts(messages)
       mod = Keyword.fetch!(state, :mod)
       # TODO: нужно l все erl файлы проекта
-      files = Path.wildcard(File.cwd!()<>"/deps/#{mod}/src/*.erl")
+      files = Path.wildcard(File.cwd!()<>"/deps/#{mod}/**/*.erl")
       Enum.each(files, fn f ->
                           mod0 = String.to_atom(Path.basename(f, ".erl"))
                           IEx.Helpers.l(mod0)
@@ -68,6 +68,7 @@ defmodule ActiveEx.Events do
       stateAfter = []
       {:noreply, stateAfter}
     end
+
 
     def handle_info({_port, {:data, {type, line}}}, state) when type == :eol or type == :noeol do
         # IO.inspect(state, label: "state before line")
