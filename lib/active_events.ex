@@ -146,7 +146,7 @@ defmodule ActiveEx.Events do
                                                             stateAfter0
                                                             # IO.inspect(flags, label: "path flags")
 
-                                              {_, ".ex"} -> state0 = Keyword.put(state, :path, path)
+                                              {_, ".ex"} -> _state0 = Keyword.put(state, :path, path)
                                                             IO.puts("active_ex: Recompiling elixir module (received: #{path})")
                                                             try do
                                                                 compile_load(path, true)
@@ -169,7 +169,7 @@ defmodule ActiveEx.Events do
 
     def compile_load(path, recompile) do
       case IEx.Helpers.c(to_string(path), :in_memory) do
-        [] -> IO.puts("active_ex: Couldn't compile #{path}")
+        [] -> IO.puts("active_ex: Didn't compile #{path}")
               :ignore
         modules -> Enum.each(modules, fn(mod) -> case recompile do
                                                     true -> IEx.Helpers.r(mod)
@@ -179,9 +179,6 @@ defmodule ActiveEx.Events do
       end
     end
 
-    def test() do
-      IO.puts("test 4!")
-    end
 
     def get_module_name(dirs) do
       name = Enum.reduce(dirs, false, fn x, acc -> case acc do
@@ -200,38 +197,12 @@ defmodule ActiveEx.Events do
       end
     end
 
-
-    # sh functions
-    def reduce({_, chunk}, acc), do: [chunk|acc]
-    def reduce([], acc), do: acc
-    def reduce(data, acc), do: [data|acc]
-
     def run(args) do
-      _port = :erlang.open_port({:spawn_executable, :os.find_executable('sh')},
+      :erlang.open_port({:spawn_executable, :os.find_executable('sh')},
                         [:stream, :in, :out, :eof, :use_stdio, :stderr_to_stdout, :binary, :exit_status,
                           {:args, ["-c", args]}, {:cd, :erlang.element(2, :file.get_cwd())}, {:env, []}])
 
-      # {:done, _status, info} = sh(port)
-      # info
-    end
 
-    def sh(port), do: sh(port, &__MODULE__.reduce/2, [])
-    def sh(port, fun, acc) do
-          receive do
-            # {_Pid, {:fs, :file_event}, {^path, _}} -> sh(port, fun, fun.([], acc))
-            {_Pid, {:fs, :file_event}, _} = data -> handle_info(data, [])
-                                            sh(port, fun, fun.([], acc))
-            # {^port, :eof} -> sh(port, fun, fun.([], acc))
-            {^port, {:exit_status, status}} -> {:done, status, :erlang.iolist_to_binary(:lists.reverse(acc))}
-
-              {^port, {:data, {:eol, line}}} -> sh(port, fun, fun.({:eol, line}, acc))
-            {^port, {:data, {:noeol, line}}} -> sh(port, fun, fun.({:noeol, line}, acc))
-                      {^port, {:data, data}} -> sh(port, fun, fun.(data, acc))
-                       data -> #IO.inspect(data, label: "sh loop ignore data")
-                              handle_info(data, [])
-                              sh(port, fun, fun.([], acc)) #{:exit, data, :erlang.iolist_to_binary(:lists.reverse(acc))}
-
-          end
     end
 
   end

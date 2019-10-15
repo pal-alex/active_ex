@@ -19,8 +19,7 @@ defmodule ActiveEx.MixProject do
 
   defp deps do
     [
-      {:fs, "~> 3.4", override: true}
-
+      {:fs, "~> 3.4"}
     ]
   end
 end
