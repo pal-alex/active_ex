@@ -36,7 +36,8 @@ defmodule ActiveEx.MixProject do
 
   defp deps do
     [
-      {:fs, "~> 4.10.0"}
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}    ]
+      {:fs, "~> 4.10.0"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+    ]
   end
 end
