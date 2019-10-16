@@ -1,6 +1,6 @@
 # ActiveEx
 
-**TODO: Add description**
+ActiveEx is a sync replacement that uses native file-system OS async listeners to automatic compile and to reload after saving all *.ex and *.erl files of a project. It acts as a FS subscriber under supervision. NOTE: On Linux you need to install inotify-tools.
 
 ## Installation
 
@@ -10,7 +10,7 @@ by adding `active_ex` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:active_ex, "~> 0.1.0"}
+    {:active_ex, "~> 1.0.0"}
   ]
 end
 ```

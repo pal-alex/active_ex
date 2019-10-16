@@ -20,7 +20,6 @@ defmodule ActiveEx.Events do
 
     @impl true
     def init(stack) do
-      Process.flag(:trap_exit, true)
       IO.puts("fs subscribe active_ex")
       {:ok, _pid} = :fs.start_link(:active_ex)
       :fs.subscribe(:active_ex)
