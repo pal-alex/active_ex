@@ -57,7 +57,6 @@ defmodule ActiveEx.Events do
       messages = :erlang.iolist_to_binary(:lists.reverse(acc))
       IO.puts(messages)
       mod = Keyword.fetch!(state, :mod)
-      # TODO: нужно l все erl файлы проекта
       files = Path.wildcard(File.cwd!()<>"/deps/#{mod}/**/*.erl")
       Enum.each(files, fn f ->
                           mod0 = String.to_atom(Path.basename(f, ".erl"))

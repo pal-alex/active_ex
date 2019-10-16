@@ -1,7 +1,7 @@
 # ActiveEx
 
-ActiveEx is a sync replacement that uses native file-system OS async listeners to automatic compile and to reload after saving all *.ex and *.erl files of a project. It acts as a FS subscriber under supervision. NOTE: On Linux you need to install inotify-tools.
-
+ActiveEx is a sync replacement that uses native file-system OS async listeners to automatic compile and to reload after saving all *.ex and *.erl files of a project. It acts as a FS subscriber under supervision.
+NOTE: On Linux you need to install inotify-tools.
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
